@@ -135,12 +135,8 @@ all.config
 # fetched Android config fragments
 kernel/configs/android-*.cfg
 
-# OemPorts10T
+# etc
 build.log
-log.txt
-build
-batch_build
 build.sh
+token.sh
 out/
-AnyKernel3/anykernel.sh
-*.zip
