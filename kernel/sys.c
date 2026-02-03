@@ -1250,16 +1250,13 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 
 	down_read(&uts_sem);
 	memcpy(&tmp, utsname(), sizeof(tmp));
-	if (cur_uid == 0) {
-        if (unlikely(!strncmp(current->comm, "bpfloader", 9) ||
-                     !strncmp(current->comm, "netbpfload", 10) ||
-                     !strncmp(current->comm, "netd", 4))) {
-            strlcpy(tmp.release, "5.10.248", sizeof(tmp.release));
-        }
-    }
-	else if (cur_uid >= 1000) {
-        strlcpy(tmp.release, "5.10.248-Oxygen+", sizeof(tmp.release));
-    }
+	if (!strncmp(current->comm, "bpfloader", 9) ||
+	    !strncmp(current->comm, "netbpfload", 10) ||
+		!strncmp(current->comm, "netd", 4)) {
+		strcpy(tmp.release, "5.10.248");
+		pr_debug("fake uname: %s/%d release=%s\n",
+			 current->comm, current->pid, tmp.release);
+	}
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 	susfs_spoof_uname(&tmp);
 #endif
