@@ -4,33 +4,33 @@
 # Telegram token
 source token.sh
 
-# Начало отсчета времени выполнения скрипта
+# Start of script execution time countdown
 start_time=$(date +%s)
 
-# Удаление каталога "out", если он существует
+# Remove the "out" directory if it exists
 rm -rf out
 
-# Основной каталог
+# Main catalog
 MAINPATH=/workspaces # измените, если необходимо
 
-# Каталог ядра
+# Kernel directories
 KERNEL_DIR=$MAINPATH
 KERNEL_PATH=$KERNEL_DIR/kernel_xiaomi_sm8250-oxy
 
 git log $LAST..HEAD > ../changelog.txt
 BRANCH=$(git branch --show-current)
 
-# Каталоги компиляторов
+# Compiler directories
 CLANG_DIR=$KERNEL_DIR/clang20
 
-# Проверка и клонирование, если необходимо
+# Check and clone if necessary
 check_and_clone() {
     local dir=$1
     local repo=$2
     local name=$3
 
     if [ ! -d $dir ]; then
-        echo Папка $dir не существует. Клонирование $repo
+        echo Folder $dir does not exist. Cloning $repo
         cd $dir
         git clone $repo $name
     fi
@@ -41,7 +41,7 @@ check_and_wget() {
     local repo=$2
 
     if [ ! -d $dir ]; then
-        echo Папка $dir не существует. Клонирование $repo
+        echo Folder $dir does not exist. Cloning $repo
         mkdir $dir
         cd $dir
         wget -O clang.tar.gz $repo
@@ -51,41 +51,41 @@ check_and_wget() {
     fi
 }
 
-# Клонирование инструментов компиляции, если они не существуют
+# Cloning compilation tools if they don't exist
 check_and_wget $CLANG_DIR \
     https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
 
-# Каталог для сборки Oxygen+
+# Oxygen+ compilation directory
 OXY_DIR=$KERNEL_DIR/Oxy-munch
 
-# Создание каталога OXY, если его нет
+# Create the OXY directory if it does not exist
 if [ ! -d $OXY_DIR ]; then
     mkdir -p $OXY_DIR
     
-    # Проверка и клонирование Anykernel, если OXY не существует
+    # Checking and cloning Anykernel if OXY does not exist
     if [ ! -d $OXY_DIR/Anykernel ]; then
         git clone https://github.com/Olzhas-Kdyr/Anykernel.git \
             $OXY_DIR/Anykernel
         
-        # Перемещение всех файлов из Anykernel в OXY
+        # Moving all files from Anykernel to OXY
         mv $OXY_DIR/Anykernel/* $OXY_DIR/
         
-        # Удаление папки Anykernel
+        # Deleting the Anykernel folder
         rm -rf $OXY_DIR/Anykernel
     fi
 else
-    # Если папка OXY существует, проверить наличие .git и удалить, если есть
+    # If the OXY folder exists, check for .git and delete it if it exists
     if [ -d $OXY_DIR/.git ]; then
         rm -rf $OXY_DIR/.git
     fi
 fi
 
-# Экспорт переменных среды
+# Exporting environment variables
 IMGPATH=$OXY_DIR/Image
 DTBPATH=$OXY_DIR/dtb
 DTBOPATH=$OXY_DIR/dtbo.img
 
-# Установка переменных PATH
+# Setting PATH variables
 export PATH=$CLANG_DIR/bin:$GCC_AARCH64_DIR/bin:$GCC_ARM_DIR/bin:$PATH
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -93,17 +93,17 @@ export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 export KBUILD_BUILD_USER=olzhas
 export KBUILD_BUILD_HOST=ubuntu
 
-# Запись времени сборки
+# Recording building time
 OXY_BUILD_DATE=$(date '+%Y-%m-%d_%H-%M-%S')
 
-# Каталог для результатов сборки
+# Directory for building results
 OUT_DIR=out
 
-# Конфигурация ядра
+# Kernel configuration
 make O="$OUT_DIR" \
             vendor/munch_defconfig
 
-    # Компиляция ядра
+    # Kernel compilation
     make -j $(nproc) \
                 O="$OUT_DIR" \
                 CC="ccache clang" \
@@ -120,25 +120,25 @@ make O="$OUT_DIR" \
                 V=$VERBOSE 2>&1 | tee build.log
                 
 
-# Предполагается, что переменная DTS установлена ранее в скрипте
+# It is assumed that the DTS variable is set earlier in the script
 find $DTS -name '*.dtb' -exec cat {} + > $DTBPATH
 find $DTS -name 'Image' -exec cat {} + > $IMGPATH
 find $DTS -name 'dtbo.img' -exec cat {} + > $DTBOPATH
 
-# Завершение отсчета времени выполнения скрипта
+# End of script execution time countdown
 end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
 
 cd "$KERNEL_PATH"
 
-# Проверка успешности сборки
+# Checking if the build was successful
 if grep -q -E "Ошибка 2|Error 2" build.log; then
     cd $KERNEL_PATH
-    echo Ошибка: Сборка завершилась с ошибкой
+    echo Error: The build failed.
 
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
     -d chat_id=@olzkernel \
-    -d text="Ошибка в компиляции!" \
+    -d text="Compilation error!" \
     -d message_thread_id=3
 
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@olzkernel \
@@ -149,14 +149,14 @@ if grep -q -E "Ошибка 2|Error 2" build.log; then
     -F document=@../changelog.txt \
     -F message_thread_id=3
 else
-    echo Общее время выполнения: $elapsed_time секунд
-    # Перемещение в каталог OXY и создание архива
+    echo Total execution time: $elapsed_time seconds
+    # Moving to the OXY directory and creating an archive
     cd $OXY_DIR
     7z a -mx9 4.19.325-Oxygen+munch-$OXY_BUILD_DATE.zip * -x!*.zip
     
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
     -d chat_id=@olzkernel \
-    -d text="Компиляция завершилась успешно! Время выполнения: $elapsed_time секунд" \
+    -d text="Compilation completed successfully! Execution time: $elapsed_time seconds" \
     -d message_thread_id=3
 
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@olzkernel \
